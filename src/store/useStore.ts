@@ -25,6 +25,13 @@ function createDefaultShadows(): ShadowLayer[] {
   ];
 }
 
+function createDefaultTypography(): Project['typography'] {
+  return {
+    baseFontSize: 16,
+    ratio: 1.25,
+  };
+}
+
 function createDefaultProject(name: string, brandColor: string): Project {
   return {
     id: generateId(),
@@ -39,6 +46,7 @@ function createDefaultProject(name: string, brandColor: string): Project {
       opacity: 0.1,
       borderColor: 'rgba(255,255,255,0.2)',
     },
+    typography: createDefaultTypography(),
   };
 }
 
@@ -144,6 +152,15 @@ export const useStore = create<AppState>()(
           ),
         })),
 
+      updateTypography: (typography: Partial<Project['typography']>) =>
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === state.activeProjectId
+              ? { ...p, typography: { ...p.typography, ...typography } }
+              : p
+          ),
+        })),
+
       setPreviewMode: (mode: 'light' | 'dark') => set({ previewMode: mode }),
 
       setColorBlindMode: (mode) => set({ colorBlindMode: mode }),
@@ -156,8 +173,15 @@ export const useStore = create<AppState>()(
         previewMode: state.previewMode,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state && state.projects.length > 0 && !state.activeProjectId) {
-          state.activeProjectId = state.projects[0].id;
+        if (!state) return;
+        if (state.projects.length > 0) {
+          state.projects = state.projects.map((p) => ({
+            ...p,
+            typography: p.typography ?? { baseFontSize: 16, ratio: 1.25 },
+          }));
+          if (!state.activeProjectId) {
+            state.activeProjectId = state.projects[0].id;
+          }
         }
       },
     }
