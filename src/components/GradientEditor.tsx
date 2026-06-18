@@ -17,9 +17,11 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function toGradientCSS(type: 'linear' | 'radial', angle: number, stops: GradientStop[]) {
+function toGradientCSS(type: 'linear' | 'radial', angle: number, centerX: number, centerY: number, stops: GradientStop[]) {
   const s = [...stops].sort((a, b) => a.position - b.position).map((st) => `${st.color} ${st.position}%`).join(', ');
-  return type === 'linear' ? `linear-gradient(${angle}deg, ${s})` : `radial-gradient(circle, ${s})`;
+  return type === 'linear'
+    ? `linear-gradient(${angle}deg, ${s})`
+    : `radial-gradient(circle at ${centerX}% ${centerY}%, ${s})`;
 }
 
 export default function GradientEditor() {
@@ -36,8 +38,10 @@ export default function GradientEditor() {
   const stops = useMemo(() => projectGradient?.stops ?? [], [projectGradient]);
   const type = projectGradient?.type ?? 'linear';
   const angle = projectGradient?.angle ?? 135;
+  const centerX = projectGradient?.centerX ?? 50;
+  const centerY = projectGradient?.centerY ?? 50;
   const selectedStop = stops.find((s) => s.id === selectedId);
-  const css = projectGradient ? toGradientCSS(type, angle, stops) : '';
+  const css = projectGradient ? toGradientCSS(type, angle, centerX, centerY, stops) : '';
 
   const calcPosition = useCallback((clientX: number) => {
     if (!barRef.current) return 0;
@@ -149,7 +153,7 @@ export default function GradientEditor() {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           className={cn('px-3 py-1.5 text-xs rounded-md', type === 'linear' ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-400')}
           onClick={() => updateGradient({ type: 'linear' })}
@@ -158,7 +162,7 @@ export default function GradientEditor() {
           className={cn('px-3 py-1.5 text-xs rounded-md', type === 'radial' ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-400')}
           onClick={() => updateGradient({ type: 'radial' })}
         >径向</button>
-        {type === 'linear' && (
+        {type === 'linear' ? (
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs text-zinc-400">角度</span>
             <input
@@ -167,6 +171,27 @@ export default function GradientEditor() {
               className="w-24 accent-zinc-400"
             />
             <span className="text-xs text-zinc-300 font-mono w-8 text-right">{angle}°</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4 ml-auto">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400">X</span>
+              <input
+                type="range" min={0} max={100} value={centerX}
+                onChange={(e) => updateGradient({ centerX: Number(e.target.value) })}
+                className="w-20 accent-zinc-400"
+              />
+              <span className="text-xs text-zinc-300 font-mono w-8 text-right">{centerX}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400">Y</span>
+              <input
+                type="range" min={0} max={100} value={centerY}
+                onChange={(e) => updateGradient({ centerY: Number(e.target.value) })}
+                className="w-20 accent-zinc-400"
+              />
+              <span className="text-xs text-zinc-300 font-mono w-8 text-right">{centerY}%</span>
+            </div>
           </div>
         )}
       </div>
@@ -179,7 +204,7 @@ export default function GradientEditor() {
               key={p.name}
               onClick={() => applyPreset(p)}
               className="flex-1 h-8 rounded-md border border-zinc-700 hover:border-zinc-500 transition-colors"
-              style={{ background: toGradientCSS('linear', 135, p.stops.map((s) => ({ ...s, id: '' }))) }}
+              style={{ background: toGradientCSS('linear', 135, 50, 50, p.stops.map((s) => ({ ...s, id: '' }))) }}
               title={p.name}
             />
           ))}

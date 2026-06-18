@@ -10,6 +10,8 @@ function createDefaultGradient(): Project['gradient'] {
   return {
     type: 'linear',
     angle: 135,
+    centerX: 50,
+    centerY: 50,
     stops: [
       { id: generateId(), color: '#6366f1', position: 0 },
       { id: generateId(), color: '#ec4899', position: 50 },
@@ -178,6 +180,11 @@ export const useStore = create<AppState>()(
           state.projects = state.projects.map((p) => ({
             ...p,
             typography: p.typography ?? { baseFontSize: 16, ratio: 1.25 },
+            gradient: {
+              ...p.gradient,
+              centerX: (p.gradient as Project['gradient'] & { centerX?: number }).centerX ?? 50,
+              centerY: (p.gradient as Project['gradient'] & { centerY?: number }).centerY ?? 50,
+            },
           }));
           if (!state.activeProjectId) {
             state.activeProjectId = state.projects[0].id;

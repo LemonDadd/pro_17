@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Copy, Check, Plus, Trash2 } from 'lucide-react';
+import { Copy, Check, Plus, Trash2, GripVertical } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
 import type { ShadowLayer } from '@/types';
 
@@ -28,11 +29,31 @@ const PRESETS: { name: string; layers: Omit<ShadowLayer, 'id'>[] }[] = [
   },
 ];
 
-function LayerRow({ layer, onChange, onRemove }: {
+interface LayerRowProps {
   layer: ShadowLayer;
   onChange: (patch: Partial<ShadowLayer>) => void;
   onRemove: () => void;
-}) {
+  onDragStart: (id: string) => void;
+  onDragOver: (id: string) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
+  isDragOver: boolean;
+  dropPosition: 'before' | 'after' | null;
+}
+
+function LayerRow({
+  layer,
+  onChange,
+  onRemove,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragging,
+  isDragOver,
+  dropPosition,
+}: LayerRowProps) {
   const fields: { key: keyof ShadowLayer; label: string; min: number; max: number }[] = [
     { key: 'x', label: 'X', min: -50, max: 50 },
     { key: 'y', label: 'Y', min: -50, max: 50 },
@@ -41,38 +62,85 @@ function LayerRow({ layer, onChange, onRemove }: {
   ];
 
   return (
-    <div className="bg-zinc-900 rounded-lg p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={layer.color.startsWith('rgba') ? '#000000' : layer.color}
-          onChange={(e) => onChange({ color: e.target.value })}
-          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
-        />
-        <span className="text-xs text-zinc-500 font-mono flex-1">{layer.color}</span>
-        <label className="flex items-center gap-1 text-xs text-zinc-400 cursor-pointer">
+    <div
+      className={cn(
+        'relative',
+        isDragging && 'opacity-40'
+      )}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', layer.id);
+        onDragStart(layer.id);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        onDragOver(layer.id);
+        void midpoint;
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        void midpoint;
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      onDragEnd={onDragEnd}
+    >
+      {isDragOver && dropPosition === 'before' && (
+        <div className="absolute -top-1 left-0 right-0 h-0.5 rounded-full bg-zinc-400 z-10" />
+      )}
+      {isDragOver && dropPosition === 'after' && (
+        <div className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-zinc-400 z-10" />
+      )}
+      <div className="bg-zinc-900 rounded-lg p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing shrink-0"
+            title="拖拽排序"
+          >
+            <GripVertical size={14} />
+          </button>
           <input
-            type="checkbox" checked={layer.inset}
-            onChange={(e) => onChange({ inset: e.target.checked })}
-            className="accent-zinc-400"
+            type="color"
+            value={layer.color.startsWith('rgba') ? '#000000' : layer.color}
+            onChange={(e) => onChange({ color: e.target.value })}
+            className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0"
           />
-          内阴影
-        </label>
-        <button onClick={onRemove} className="text-zinc-600 hover:text-red-400"><Trash2 size={14} /></button>
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        {fields.map((f) => (
-          <div key={f.key} className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 w-6">{f.label}</span>
+          <span className="text-xs text-zinc-500 font-mono flex-1 truncate">{layer.color}</span>
+          <label className="flex items-center gap-1 text-xs text-zinc-400 cursor-pointer shrink-0">
             <input
-              type="range" min={f.min} max={f.max}
-              value={layer[f.key] as number}
-              onChange={(e) => onChange({ [f.key]: Number(e.target.value) })}
-              className="flex-1 accent-zinc-400"
+              type="checkbox" checked={layer.inset}
+              onChange={(e) => onChange({ inset: e.target.checked })}
+              className="accent-zinc-400"
             />
-            <span className="text-xs text-zinc-400 font-mono w-6 text-right">{layer[f.key] as number}</span>
-          </div>
-        ))}
+            内阴影
+          </label>
+          <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 shrink-0">
+            <Trash2 size={14} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          {fields.map((f) => (
+            <div key={f.key} className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 w-6 shrink-0">{f.label}</span>
+              <input
+                type="range" min={f.min} max={f.max}
+                value={layer[f.key] as number}
+                onChange={(e) => onChange({ [f.key]: Number(e.target.value) })}
+                className="flex-1 accent-zinc-400"
+              />
+              <span className="text-xs text-zinc-400 font-mono w-6 text-right shrink-0">{layer[f.key] as number}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -82,6 +150,8 @@ export default function ShadowEditor() {
   const project = useStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const updateShadows = useStore((s) => s.updateShadows);
   const [copied, setCopied] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   if (!project) return null;
 
@@ -109,6 +179,39 @@ export default function ShadowEditor() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handleDragStart = (id: string) => {
+    setDraggingId(id);
+  };
+
+  const handleDragOver = (targetId: string) => {
+    if (draggingId && draggingId !== targetId) {
+      setDragOverId(targetId);
+    }
+  };
+
+  const handleDrop = (targetId: string) => {
+    if (!draggingId || draggingId === targetId) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+    const dragIndex = shadows.findIndex((l) => l.id === draggingId);
+    const dropIndex = shadows.findIndex((l) => l.id === targetId);
+    if (dragIndex === -1 || dropIndex === -1) return;
+
+    const newShadows = [...shadows];
+    const [removed] = newShadows.splice(dragIndex, 1);
+    newShadows.splice(dropIndex, 0, removed);
+    updateShadows(newShadows);
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center p-8 bg-zinc-900 rounded-xl">
@@ -132,14 +235,30 @@ export default function ShadowEditor() {
       </div>
 
       <div className="space-y-2">
-        {shadows.map((layer) => (
-          <LayerRow
-            key={layer.id}
-            layer={layer}
-            onChange={(patch) => updateLayer(layer.id, patch)}
-            onRemove={() => removeLayer(layer.id)}
-          />
-        ))}
+        {shadows.map((layer, index) => {
+          const isDragging = draggingId === layer.id;
+          const isDragOver = dragOverId === layer.id;
+          let dropPosition: 'before' | 'after' | null = null;
+          if (isDragOver && draggingId) {
+            const dragIndex = shadows.findIndex((l) => l.id === draggingId);
+            dropPosition = dragIndex > index ? 'before' : 'after';
+          }
+          return (
+            <LayerRow
+              key={layer.id}
+              layer={layer}
+              onChange={(patch) => updateLayer(layer.id, patch)}
+              onRemove={() => removeLayer(layer.id)}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(layer.id)}
+              onDragEnd={handleDragEnd}
+              isDragging={isDragging}
+              isDragOver={isDragOver}
+              dropPosition={dropPosition}
+            />
+          );
+        })}
       </div>
 
       <button

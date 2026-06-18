@@ -4,9 +4,11 @@ import { useStore } from '@/store/useStore';
 import { generatePalette, contrastPass } from '@/utils/color';
 import type { GradientStop, ShadowLayer } from '@/types';
 
-function gradientToCSS(type: 'linear' | 'radial', angle: number, stops: GradientStop[]) {
+function gradientToCSS(type: 'linear' | 'radial', angle: number, centerX: number, centerY: number, stops: GradientStop[]) {
   const s = [...stops].sort((a, b) => a.position - b.position).map((st) => `${st.color} ${st.position}%`).join(', ');
-  return type === 'linear' ? `linear-gradient(${angle}deg, ${s})` : `radial-gradient(circle, ${s})`;
+  return type === 'linear'
+    ? `linear-gradient(${angle}deg, ${s})`
+    : `radial-gradient(circle at ${centerX}% ${centerY}%, ${s})`;
 }
 
 function shadowToCSS(layers: ShadowLayer[]) {
@@ -31,7 +33,9 @@ export default function PreviewPanel() {
   const shadows = activeProject?.shadows ?? [];
   const glass = activeProject?.glassmorphism;
 
-  const gradientCSS = gradient ? gradientToCSS(gradient.type, gradient.angle, gradient.stops) : '';
+  const gradientCSS = gradient
+    ? gradientToCSS(gradient.type, gradient.angle, gradient.centerX ?? 50, gradient.centerY ?? 50, gradient.stops)
+    : '';
   const shadowCSS = shadowToCSS(shadows);
 
   const bg = isLight ? '#ffffff' : '#09090b';

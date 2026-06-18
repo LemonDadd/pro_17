@@ -57,6 +57,8 @@ export interface Project {
   gradient: {
     type: 'linear' | 'radial';
     angle: number;
+    centerX: number;
+    centerY: number;
     stops: GradientStop[];
   };
   shadows: ShadowLayer[];
