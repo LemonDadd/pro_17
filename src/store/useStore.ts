@@ -60,6 +60,23 @@ export const useStore = create<AppState>()(
         }));
       },
 
+      importProject: (project: Project) =>
+        set((state) => {
+          const exists = state.projects.some((p) => p.id === project.id);
+          if (exists) {
+            return {
+              projects: state.projects.map((p) =>
+                p.id === project.id ? project : p
+              ),
+              activeProjectId: project.id,
+            };
+          }
+          return {
+            projects: [...state.projects, project],
+            activeProjectId: project.id,
+          };
+        }),
+
       deleteProject: (id: string) =>
         set((state) => {
           const projects = state.projects.filter((p) => p.id !== id);

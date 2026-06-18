@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
-import { generateColorScheme, simulateColorBlind, hexToOklch } from '@/utils/color';
+import { generateColorScheme, simulateColorBlind, hexToOklch, oklchToHex } from '@/utils/color';
 import type { ColorSchemeType, ColorBlindType } from '@/types';
 
 const SCHEME_LABELS: Record<ColorSchemeType, string> = {
@@ -20,9 +20,14 @@ const BLIND_OPTIONS: { value: ColorBlindType; label: string }[] = [
   { value: 'deutan', label: '绿色盲' },
 ];
 
+const WHEEL_SIZE = 140;
+const WHEEL_RADIUS = 55;
+const WHEEL_CENTER = WHEEL_SIZE / 2;
+
 export default function ColorSchemes() {
   const projects = useStore((s) => s.projects);
   const activeProjectId = useStore((s) => s.activeProjectId);
+  const updateBrandColor = useStore((s) => s.updateBrandColor);
   const updateColorSchemeType = useStore((s) => s.updateColorSchemeType);
   const colorBlindMode = useStore((s) => s.colorBlindMode);
   const setColorBlindMode = useStore((s) => s.setColorBlindMode);
@@ -30,6 +35,9 @@ export default function ColorSchemes() {
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const brandColor = activeProject?.brandColor ?? '#6366f1';
   const schemeType = activeProject?.colorSchemeType ?? 'complementary';
+
+  const oklch = useMemo(() => hexToOklch(brandColor), [brandColor]);
+  const hue = oklch.h;
 
   const schemeColors = useMemo(
     () => generateColorScheme(brandColor, schemeType),
@@ -44,7 +52,82 @@ export default function ColorSchemes() {
     [schemeColors, colorBlindMode]
   );
 
-  const hue = hexToOklch(brandColor).h;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const calculateHue = useCallback((clientX: number, clientY: number): number | null => {
+    if (!svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = clientX - rect.left - WHEEL_CENTER;
+    const y = clientY - rect.top - WHEEL_CENTER;
+    const dist = Math.sqrt(x * x + y * y);
+    if (dist < WHEEL_RADIUS - 20 || dist > WHEEL_RADIUS + 20) return null;
+    let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+    return angle % 360;
+  }, []);
+
+  const handleInteraction = useCallback(
+    (clientX: number, clientY: number) => {
+      const newHue = calculateHue(clientX, clientY);
+      if (newHue === null) return;
+      const newColor = oklchToHex(oklch.l, oklch.c, newHue);
+      updateBrandColor(newColor);
+    },
+    [calculateHue, oklch.l, oklch.c, updateBrandColor]
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      handleInteraction(e.clientX, e.clientY);
+    },
+    [handleInteraction]
+  );
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleInteraction(e.clientX, e.clientY);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleInteraction]);
+
+  const markers = useMemo(() => {
+    switch (schemeType) {
+      case 'analogous':
+        return [(hue - 30 + 360) % 360, hue, (hue + 30) % 360];
+      case 'complementary':
+        return [hue, (hue + 180) % 360];
+      case 'triadic':
+        return [hue, (hue + 120) % 360, (hue + 240) % 360];
+      case 'tetradic':
+        return [hue, (hue + 90) % 360, (hue + 180) % 360, (hue + 270) % 360];
+      default:
+        return [hue];
+    }
+  }, [hue, schemeType]);
+
+  const conicGradient = useMemo(() => {
+    const stops = [];
+    for (let i = 0; i <= 360; i += 30) {
+      const color = oklchToHex(oklch.l, oklch.c, i);
+      stops.push(`${color} ${i}deg`);
+    }
+    return `conic-gradient(from -90deg, ${stops.join(', ')})`;
+  }, [oklch.l, oklch.c]);
 
   return (
     <div className="space-y-4">
@@ -68,17 +151,96 @@ export default function ColorSchemes() {
       </div>
 
       <div className="flex justify-center">
-        <ColorWheelSVG hue={hue} schemeType={schemeType} />
+        <div className="relative">
+          <svg
+            ref={svgRef}
+            width={WHEEL_SIZE}
+            height={WHEEL_SIZE}
+            viewBox={`0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`}
+            onMouseDown={handleMouseDown}
+            className={cn('cursor-crosshair select-none', isDragging && 'cursor-grabbing')}
+          >
+            <defs>
+              <mask id="wheelMask">
+                <circle cx={WHEEL_CENTER} cy={WHEEL_CENTER} r={WHEEL_RADIUS} fill="white" />
+                <circle cx={WHEEL_CENTER} cy={WHEEL_CENTER} r={WHEEL_RADIUS - 16} fill="black" />
+              </mask>
+            </defs>
+            <foreignObject
+              x={WHEEL_CENTER - WHEEL_RADIUS}
+              y={WHEEL_CENTER - WHEEL_RADIUS}
+              width={WHEEL_RADIUS * 2}
+              height={WHEEL_RADIUS * 2}
+              mask="url(#wheelMask)"
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  background: conicGradient,
+                }}
+              />
+            </foreignObject>
+            {markers.map((h, i) => {
+              const rad = (h - 90) * (Math.PI / 180);
+              const cx = WHEEL_CENTER + WHEEL_RADIUS * Math.cos(rad);
+              const cy = WHEEL_CENTER + WHEEL_RADIUS * Math.sin(rad);
+              return (
+                <g key={i}>
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={i === 0 ? 9 : 6}
+                    fill="white"
+                    stroke="#18181b"
+                    strokeWidth={2}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                  />
+                  {i === 0 && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={4}
+                      fill={brandColor}
+                    />
+                  )}
+                </g>
+              );
+            })}
+            <circle
+              cx={WHEEL_CENTER}
+              cy={WHEEL_CENTER}
+              r={WHEEL_RADIUS - 20}
+              fill="#18181b"
+              stroke="#27272a"
+              strokeWidth={1}
+            />
+            <text
+              x={WHEEL_CENTER}
+              y={WHEEL_CENTER + 4}
+              textAnchor="middle"
+              className="fill-zinc-400 text-[11px] font-mono"
+            >
+              {Math.round(hue)}°
+            </text>
+          </svg>
+          <p className="text-center text-[10px] text-zinc-600 mt-2">
+            拖拽或点击色轮调整主色
+          </p>
+        </div>
       </div>
 
-      <div className="flex gap-2 justify-center">
+      <div className="flex gap-2 justify-center flex-wrap">
         {displayColors.map((color, i) => (
           <div key={i} className="flex flex-col items-center gap-1.5">
             <div
-              className="w-14 h-14 rounded-xl border-2 border-zinc-700 shadow-lg transition-all hover:scale-105"
+              className="w-12 h-12 rounded-xl border-2 border-zinc-700 shadow-lg transition-all hover:scale-105 cursor-pointer"
               style={{ backgroundColor: color }}
+              onClick={() => updateBrandColor(color)}
+              title={`设为主色: ${color}`}
             />
-            <span className="text-[10px] font-mono text-zinc-500">{color.toUpperCase()}</span>
+            <span className="text-[10px] font-mono text-zinc-500">{color.toUpperCase().slice(0, 7)}</span>
           </div>
         ))}
       </div>
@@ -113,59 +275,5 @@ export default function ColorSchemes() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ColorWheelSVG({ hue, schemeType }: { hue: number; schemeType: ColorSchemeType }) {
-  const markers = useMemo(() => {
-    switch (schemeType) {
-      case 'analogous':
-        return [(hue - 30 + 360) % 360, hue, (hue + 30) % 360];
-      case 'complementary':
-        return [hue, (hue + 180) % 360];
-      case 'triadic':
-        return [hue, (hue + 120) % 360, (hue + 240) % 360];
-      case 'tetradic':
-        return [hue, (hue + 90) % 360, (hue + 180) % 360, (hue + 270) % 360];
-      default:
-        return [hue];
-    }
-  }, [hue, schemeType]);
-
-  return (
-    <svg width="120" height="120" viewBox="0 0 120 120">
-      <defs>
-        <linearGradient id="hueGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ff0000" />
-          <stop offset="16.7%" stopColor="#ffff00" />
-          <stop offset="33.3%" stopColor="#00ff00" />
-          <stop offset="50%" stopColor="#00ffff" />
-          <stop offset="66.7%" stopColor="#0000ff" />
-          <stop offset="83.3%" stopColor="#ff00ff" />
-          <stop offset="100%" stopColor="#ff0000" />
-        </linearGradient>
-      </defs>
-      <circle cx="60" cy="60" r="50" fill="none" stroke="url(#hueGrad)" strokeWidth="8" opacity="0.6" />
-      {markers.map((h, i) => {
-        const rad = (h - 90) * (Math.PI / 180);
-        const cx = 60 + 50 * Math.cos(rad);
-        const cy = 60 + 50 * Math.sin(rad);
-        return (
-          <circle
-            key={i}
-            cx={cx}
-            cy={cy}
-            r={i === 0 ? 6 : 4}
-            fill={i === 0 ? '#fff' : '#ddd'}
-            stroke={i === 0 ? '#000' : '#555'}
-            strokeWidth={2}
-          />
-        );
-      })}
-      <circle cx="60" cy="60" r="20" fill="#18181b" />
-      <text x="60" y="64" textAnchor="middle" className="fill-zinc-500 text-[10px] font-mono">
-        {Math.round(hue)}°
-      </text>
-    </svg>
   );
 }

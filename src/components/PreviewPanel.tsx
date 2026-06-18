@@ -1,7 +1,20 @@
 import { Sun, Moon, CheckCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
-import { generatePalette } from '@/utils/color';
+import { generatePalette, contrastPass } from '@/utils/color';
+import type { GradientStop, ShadowLayer } from '@/types';
+
+function gradientToCSS(type: 'linear' | 'radial', angle: number, stops: GradientStop[]) {
+  const s = [...stops].sort((a, b) => a.position - b.position).map((st) => `${st.color} ${st.position}%`).join(', ');
+  return type === 'linear' ? `linear-gradient(${angle}deg, ${s})` : `radial-gradient(circle, ${s})`;
+}
+
+function shadowToCSS(layers: ShadowLayer[]) {
+  return layers.map((l) => {
+    const inset = l.inset ? 'inset ' : '';
+    return `${inset}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${l.color}`;
+  }).join(', ');
+}
 
 export default function PreviewPanel() {
   const projects = useStore((s) => s.projects);
@@ -14,11 +27,24 @@ export default function PreviewPanel() {
   const palette = generatePalette(brandColor);
   const isLight = previewMode === 'light';
 
+  const gradient = activeProject?.gradient;
+  const shadows = activeProject?.shadows ?? [];
+  const glass = activeProject?.glassmorphism;
+
+  const gradientCSS = gradient ? gradientToCSS(gradient.type, gradient.angle, gradient.stops) : '';
+  const shadowCSS = shadowToCSS(shadows);
+
   const bg = isLight ? '#ffffff' : '#09090b';
   const cardBg = isLight ? palette['50'] : palette['900'];
   const textPrimary = isLight ? '#18181b' : '#f4f4f5';
   const textSecondary = isLight ? '#52525b' : '#a1a1aa';
   const border = isLight ? palette['300'] : palette['700'];
+
+  const gradientTextColor = gradient && gradient.stops.length > 0
+    ? contrastPass(gradient.stops[Math.floor(gradient.stops.length / 2)].color).white
+      ? '#ffffff'
+      : '#000000'
+    : '#ffffff';
 
   return (
     <div className="space-y-4">
@@ -49,13 +75,13 @@ export default function PreviewPanel() {
       </div>
 
       <div
-        className="rounded-xl p-5 space-y-4 border transition-colors"
+        className="rounded-xl p-5 space-y-5 border transition-colors"
         style={{ backgroundColor: bg, borderColor: border }}
       >
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             className="px-4 py-2 rounded-lg text-sm font-medium text-white shadow-md transition-all hover:shadow-lg hover:brightness-110"
-            style={{ backgroundColor: palette['500'] }}
+            style={{ backgroundColor: palette['500'], boxShadow: shadowCSS }}
           >
             主要按钮
           </button>
@@ -71,6 +97,14 @@ export default function PreviewPanel() {
           >
             次要按钮
           </button>
+          {gradient && (
+            <button
+              className="px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-all hover:shadow-lg hover:brightness-105"
+              style={{ background: gradientCSS, color: gradientTextColor, boxShadow: shadowCSS }}
+            >
+              渐变按钮
+            </button>
+          )}
         </div>
 
         <div>
@@ -80,7 +114,7 @@ export default function PreviewPanel() {
           <input
             readOnly
             value="示例文本内容"
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-shadow focus:ring-2"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-shadow"
             style={{
               backgroundColor: isLight ? '#ffffff' : '#18181b',
               color: textPrimary,
@@ -92,15 +126,49 @@ export default function PreviewPanel() {
           />
         </div>
 
-        <div
-          className="rounded-xl p-4 shadow-md"
-          style={{ backgroundColor: cardBg, borderColor: border, borderWidth: '1px', borderStyle: 'solid' }}
-        >
-          <h4 className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>卡片标题</h4>
-          <p className="text-xs leading-relaxed" style={{ color: textSecondary }}>
-            这是一个使用当前调色板生成的卡片组件预览。文字颜色和背景颜色都基于品牌色自动计算。
-          </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="rounded-xl p-4"
+            style={{ backgroundColor: cardBg, boxShadow: shadowCSS, border: `1px solid ${border}` }}
+          >
+            <h4 className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>阴影卡片</h4>
+            <p className="text-xs leading-relaxed" style={{ color: textSecondary }}>
+              应用当前阴影配置的卡片效果
+            </p>
+          </div>
+
+          {gradient && (
+            <div
+              className="rounded-xl p-4"
+              style={{ background: gradientCSS, boxShadow: shadowCSS }}
+            >
+              <h4 className="text-sm font-semibold mb-1" style={{ color: gradientTextColor }}>渐变卡片</h4>
+              <p className="text-xs leading-relaxed" style={{ color: gradientTextColor, opacity: 0.9 }}>
+                应用当前渐变配置
+              </p>
+            </div>
+          )}
         </div>
+
+        {glass && (
+          <div
+            className="relative h-24 rounded-xl overflow-hidden flex items-center justify-center"
+            style={{ background: gradientCSS || `linear-gradient(135deg, ${palette['400']}, ${palette['600']})` }}
+          >
+            <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 30% 40%, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+            <div
+              className="relative w-40 rounded-xl py-3 flex items-center justify-center"
+              style={{
+                backdropFilter: `blur(${glass.blur}px)`,
+                WebkitBackdropFilter: `blur(${glass.blur}px)`,
+                backgroundColor: glass.backgroundColor,
+                border: `1px solid ${glass.borderColor}`,
+              }}
+            >
+              <span className="text-white text-xs font-medium">玻璃态效果</span>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <div

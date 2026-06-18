@@ -49,6 +49,7 @@ export interface AppState {
 
   setActiveProject: (id: string) => void;
   addProject: (name: string, brandColor: string) => void;
+  importProject: (project: Project) => void;
   deleteProject: (id: string) => void;
   renameProject: (id: string, name: string) => void;
   updateBrandColor: (color: string) => void;
