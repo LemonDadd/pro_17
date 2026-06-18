@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Copy, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
+import { toGradientCSS } from '@/utils/css';
 import type { GradientStop } from '@/types';
 
 const PRESETS: { name: string; stops: Omit<GradientStop, 'id'>[] }[] = [
@@ -15,13 +16,6 @@ const PRESETS: { name: string; stops: Omit<GradientStop, 'id'>[] }[] = [
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function toGradientCSS(type: 'linear' | 'radial', angle: number, centerX: number, centerY: number, stops: GradientStop[]) {
-  const s = [...stops].sort((a, b) => a.position - b.position).map((st) => `${st.color} ${st.position}%`).join(', ');
-  return type === 'linear'
-    ? `linear-gradient(${angle}deg, ${s})`
-    : `radial-gradient(circle at ${centerX}% ${centerY}%, ${s})`;
 }
 
 export default function GradientEditor() {

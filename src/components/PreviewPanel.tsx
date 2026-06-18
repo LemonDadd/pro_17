@@ -2,21 +2,7 @@ import { Sun, Moon, CheckCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
 import { generatePalette, contrastPass } from '@/utils/color';
-import type { GradientStop, ShadowLayer } from '@/types';
-
-function gradientToCSS(type: 'linear' | 'radial', angle: number, centerX: number, centerY: number, stops: GradientStop[]) {
-  const s = [...stops].sort((a, b) => a.position - b.position).map((st) => `${st.color} ${st.position}%`).join(', ');
-  return type === 'linear'
-    ? `linear-gradient(${angle}deg, ${s})`
-    : `radial-gradient(circle at ${centerX}% ${centerY}%, ${s})`;
-}
-
-function shadowToCSS(layers: ShadowLayer[]) {
-  return layers.map((l) => {
-    const inset = l.inset ? 'inset ' : '';
-    return `${inset}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${l.color}`;
-  }).join(', ');
-}
+import { toGradientCSS, toShadowCSS } from '@/utils/css';
 
 export default function PreviewPanel() {
   const projects = useStore((s) => s.projects);
@@ -34,9 +20,9 @@ export default function PreviewPanel() {
   const glass = activeProject?.glassmorphism;
 
   const gradientCSS = gradient
-    ? gradientToCSS(gradient.type, gradient.angle, gradient.centerX ?? 50, gradient.centerY ?? 50, gradient.stops)
+    ? toGradientCSS(gradient.type, gradient.angle, gradient.centerX ?? 50, gradient.centerY ?? 50, gradient.stops)
     : '';
-  const shadowCSS = shadowToCSS(shadows);
+  const shadowCSS = toShadowCSS(shadows);
 
   const bg = isLight ? '#ffffff' : '#09090b';
   const cardBg = isLight ? palette['50'] : palette['900'];

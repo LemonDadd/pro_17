@@ -2,17 +2,11 @@ import { useState } from 'react';
 import { Copy, Check, Plus, Trash2, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
+import { toShadowCSS } from '@/utils/css';
 import type { ShadowLayer } from '@/types';
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function toShadowCSS(layers: ShadowLayer[]) {
-  return layers.map((l) => {
-    const inset = l.inset ? 'inset ' : '';
-    return `${inset}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${l.color}`;
-  }).join(', ');
 }
 
 const PRESETS: { name: string; layers: Omit<ShadowLayer, 'id'>[] }[] = [
@@ -76,16 +70,7 @@ function LayerRow({
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
         onDragOver(layer.id);
-        void midpoint;
-      }}
-      onDragEnter={(e) => {
-        e.preventDefault();
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
-        void midpoint;
       }}
       onDrop={(e) => {
         e.preventDefault();
